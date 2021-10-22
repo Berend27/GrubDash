@@ -1,5 +1,4 @@
 const nextId = require("../utils/nextId");
-const notFound = require("../errors/notFound");
 const path = require("path");
 
 // Use the existing dishes data
@@ -14,7 +13,10 @@ function dishExists(req, res, next) {
         res.locals.dish = foundDish;
         return next();
     }
-    notFound(req, res, next);
+    next({
+        status: 404,
+        message: `Dish does not exist: ${dishId}`
+    });
 }
 
 function hasDescription(req, res, next) {
@@ -50,10 +52,26 @@ function hasName(req, res, next) {
     });
 }
 
+function idMatches(req, res, next) {
+    const { dishId } = req.params;
+    const { data: { id } = {} } = req.body;
+    if (id) {
+        if (id === dishId) {
+            return next();
+        } else {
+            return next({
+                status: 400,
+                message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`
+            });
+        }
+    }
+    next();
+}
+
 function priceIsPositive(req, res, next) {
     const { data: { price } = {} } = req.body;
     if (price) {
-        if (price > 0) {
+        if (Number.isInteger(price) && price > 0) {
             return next();
         } else {
             return next({
@@ -61,14 +79,12 @@ function priceIsPositive(req, res, next) {
                 message: "Dish must have a price that is an integer greater than 0"
             });
         }
-    }
+    } 
     next({
         status: 400,
         message: "Dish must include a price"
     });
 }
-
-// TODO: Implement the /dishes handlers needed to make the tests pass
 
 function create(req, res) {
     const { data: { name, description, price, image_url } = {} } = req.body;
@@ -91,10 +107,19 @@ function read(req, res) {
     res.json({ data: res.locals.dish });
 }
 
-// todo: update
+function update(req, res) {
+    const dish = res.locals.dish;
+    const { data: { name, description, price, image_url } = {} } = req.body;
+    dish.name = name;
+    dish.description = description;
+    dish.price = price;
+    dish.image_url = image_url;
+    res.json({ data: dish });
+}
 
 module.exports = {
     create: [hasDescription, hasImageUrl, hasName, priceIsPositive, create],
     list,
-    read: [dishExists, read]
+    read: [dishExists, read],
+    update: [dishExists, hasName, idMatches, hasDescription, hasImageUrl, priceIsPositive, update],
 }
