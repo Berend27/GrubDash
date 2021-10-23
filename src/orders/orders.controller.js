@@ -7,15 +7,16 @@ const orders = require(path.resolve("src/data/orders-data"));
 const nextId = require("../utils/nextId");
 
 // Validation
-// todo: debug this
-function dishesHaveQuantity(dishes) {
-    for(let dish of dishes) {
+
+function dishesHaveQuantity(dishes, next) {
+    for(let i = 0; i < dishes.length; i++) {
+        const dish = dishes[i];
         if (Number.isInteger(dish.quantity) && dish.quantity > 0) {
             continue;
         } 
         return next({
             status: 400,
-            message: `Dish ${index} must have a quantity that is an integer greater than 0`,
+            message: `Dish ${i} must have a quantity that is an integer greater than 0`,
         });
     }
 }
@@ -31,22 +32,11 @@ function hasDeliverTo(req, res, next) {
     });
 }
 
-function hasMobileNumber(req, res, next) {
-    const { data: { mobileNumber } = {} } = req.body;
-    if (mobileNumber) {
-        return next();
-    } 
-    next({
-        status: 400,
-        message: "Order must include a mobileNumber",
-    });
-}
-
 function hasDishes(req, res, next) {
     const { data: { dishes } = {} } = req.body;
     if (dishes) {
         if (Array.isArray(dishes) && dishes.length > 0) {
-            dishesHaveQuantity(dishes);
+            dishesHaveQuantity(dishes, next);
             return next();
         } else {
             return next({
@@ -61,27 +51,118 @@ function hasDishes(req, res, next) {
     })
 }
 
+function hasMobileNumber(req, res, next) {
+    const { data: { mobileNumber } = {} } = req.body;
+    if (mobileNumber) {
+        return next();
+    } 
+    next({
+        status: 400,
+        message: "Order must include a mobileNumber",
+    });
+}
+
+function hasStatus(req, res, next) {
+    const { data: { status } = {} } = req.body;
+    if (status) {
+        validateStatus(status, next);
+    } else {
+        next({
+            status: 400,
+            message: `Order must have a status of pending, preparing, out-for-delivery, delivered`,
+        });
+    }
+}
+
+function idMatches(req, res, next) {
+    const { orderId } = req.params;
+    const { data: { id } = {} } = req.body;
+    if (id) {
+        if (id === orderId) {
+            return next();
+        } else {
+            return next({
+                status: 400,
+                message: `Order id does not match route id. Order: ${id}, Route: ${orderId}.`
+            });
+        }
+    }
+    next();
+}
+
+function isNotDelivered(req, _, next) {
+    const { data: { status } = {} } = req.body;
+    if (status === "delivered") {
+        return next({
+            status: 400,
+            message: `A delivered order cannot be changed`,
+        });
+    }
+    next();
+}
+
+function orderExists(req, res, next) {
+    const { orderId } = req.params;
+    const foundOrder = orders.find((order) => order.id === orderId);
+    if (foundOrder) {
+        res.locals.order = foundOrder;
+        return next();
+    }
+    next({
+        status: 404,
+        message: `Order does not exist, id: ${orderId}`
+    });
+}
+
+function validateStatus(status, next) {
+    const validStatuses = ["pending", "preparing", "out-for-delivery", "delivered"];
+    if (validStatuses.includes(status)) {
+        return next();
+    } else {
+        return next({
+            status: 400,
+            message: `Order must have a status of pending, preparing, out-for-delivery, delivered`,
+        });
+    }
+}
+
 // TODO: Implement the /orders handlers needed to make the tests pass
 // Route Handlers
 
 function create(req, res) {
     const { data: { deliverTo, mobileNumber, status, dishes } = {} } = req.body;
     const order = {
-        id: nextId,
+        id: nextId(),
         deliverTo,
         mobileNumber,
         status,
         dishes,
     };
     orders.push(order);
-    res.status(201).json({ data: dish });
+    res.status(201).json({ data: order });
 }
 
 function list(req, res) {
     res.json({ data: orders });
 }
 
+function read(req, res) {
+    res.json({ data: res.locals.order });
+}
+
+function update(req, res) {
+    const order = res.locals.order;
+    const { data: { deliverTo, mobileNumber, status, dishes } = {} } = req.body;
+    order.deliverTo = deliverTo;
+    order.mobileNumber = mobileNumber;
+    order.status = status;
+    order.dishes = dishes;
+    res.json({ data: order });
+}
+
 module.exports = {
     create: [hasDeliverTo, hasMobileNumber, hasDishes, create],
     list,
+    read: [orderExists, read],
+    update: [orderExists, hasDeliverTo, hasDishes, hasMobileNumber, hasStatus, idMatches, isNotDelivered, update],
 }
