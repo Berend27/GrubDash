@@ -153,7 +153,7 @@ function create(req, res) {
 }
 
 function destroy(req, res) {
-    const { orderId } = req.params;
+    const orderId = res.locals.order.id;
     const index = orders.findIndex((order) => order.id === orderId);
     orders.splice(index, 1);
     res.sendStatus(204);
