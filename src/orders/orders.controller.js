@@ -101,6 +101,17 @@ function isNotDelivered(req, _, next) {
     next();
 }
 
+function isPending(_, res, next) {
+    const status = res.locals.order.status;
+    if (status === "pending") {
+        return next();
+    }
+    next({
+        status: 400,
+        message: `An order cannot be deleted unless it is pending`
+    });
+}
+
 function orderExists(req, res, next) {
     const { orderId } = req.params;
     const foundOrder = orders.find((order) => order.id === orderId);
@@ -126,7 +137,6 @@ function validateStatus(status, next) {
     }
 }
 
-// TODO: Implement the /orders handlers needed to make the tests pass
 // Route Handlers
 
 function create(req, res) {
@@ -140,6 +150,13 @@ function create(req, res) {
     };
     orders.push(order);
     res.status(201).json({ data: order });
+}
+
+function destroy(req, res) {
+    const { orderId } = req.params;
+    const index = orders.findIndex((order) => order.id === orderId);
+    orders.splice(index, 1);
+    res.sendStatus(204);
 }
 
 function list(req, res) {
@@ -162,6 +179,7 @@ function update(req, res) {
 
 module.exports = {
     create: [hasDeliverTo, hasMobileNumber, hasDishes, create],
+    destroy: [orderExists, isPending, destroy],
     list,
     read: [orderExists, read],
     update: [orderExists, hasDeliverTo, hasDishes, hasMobileNumber, hasStatus, idMatches, isNotDelivered, update],
