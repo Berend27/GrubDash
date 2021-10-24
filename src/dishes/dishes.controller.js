@@ -55,17 +55,14 @@ function hasName(req, res, next) {
 function idMatches(req, res, next) {
     const { dishId } = req.params;
     const { data: { id } = {} } = req.body;
-    if (id) {
-        if (id === dishId) {
-            return next();
-        } else {
-            return next({
-                status: 400,
-                message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`
-            });
-        }
+    if ((id && id === dishId) || !id) {
+        return next();
+    } else {
+        return next({
+            status: 400,
+            message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`
+        });
     }
-    next();
 }
 
 function priceIsPositive(req, res, next) {

@@ -77,17 +77,14 @@ function hasStatus(req, res, next) {
 function idMatches(req, res, next) {
     const { orderId } = req.params;
     const { data: { id } = {} } = req.body;
-    if (id) {
-        if (id === orderId) {
-            return next();
-        } else {
-            return next({
-                status: 400,
-                message: `Order id does not match route id. Order: ${id}, Route: ${orderId}.`
-            });
-        }
+    if ((id && id === orderId) || !id) {
+        return next();
+    } else {
+        return next({
+            status: 400,
+            message: `Order id does not match route id. Order: ${id}, Route: ${orderId}.`
+        });
     }
-    next();
 }
 
 function isNotDelivered(req, _, next) {
